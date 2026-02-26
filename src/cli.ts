@@ -133,6 +133,7 @@ manager
     const config = loadConfig();
     const state = loadAgentManagerState(config);
     console.log(chalk.cyan(summarizeAgentManagerState(state)));
+    console.log(`기본 라우팅 전략: ${config.manager.routingStrategy}`);
   });
 
 manager

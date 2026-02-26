@@ -48,3 +48,6 @@
   - manager 실행 집계에 `routing-summary(llm/fallback/heuristic)`를 추가해 관측성을 강화했습니다.
   - `latestOutput` JSON에도 routing 집계를 포함해 후처리 파이프라인에서 바로 활용 가능하게 했습니다.
   - `ag manager status` 요약에 마지막 실행/역할 분포를 추가해 운영 시점 가시성을 개선했습니다.
+- 코멘트(23:32):
+  - `ag manager status` 출력에 `기본 라우팅 전략`을 추가해 현재 운영 모드를 즉시 확인할 수 있게 했습니다.
+  - README 명령 예시에 status 출력 의미를 반영해 운용 문맥을 보강했습니다.
