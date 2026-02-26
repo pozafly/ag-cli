@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 
 import { askModel } from './llm.js';
 import { browserResearch } from './browser.js';
+import { runWorkerTask } from './workers.js';
 import { resolveApiKey, ensureDir } from './config.js';
 
 const SYSTEM_PROMPT = `You are an autonomous software orchestrator inspired by agent-first IDEs.
@@ -64,6 +65,31 @@ export async function runBrowserSubagent(url, config) {
     title: `Research: ${data.title}`,
     path: fullPath,
     summary: `Captured ${data.links.length} links from ${url}`
+  };
+}
+
+export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 }, config) {
+  const result = await runWorkerTask({ worker, prompt, timeoutMs });
+  const outDir = ensureDir(config.artifactsDir);
+  const fullPath = path.join(outDir, `worker-${worker}-${Date.now()}.json`);
+
+  const payload = {
+    worker,
+    prompt,
+    timeoutMs,
+    exitCode: result.code,
+    killedByTimeout: result.killedByTimeout,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    success: result.code === 0 && !result.killedByTimeout
+  };
+
+  fs.writeFileSync(fullPath, JSON.stringify(payload, null, 2), 'utf8');
+  return {
+    kind: 'worker-run',
+    title: `${worker} 워커 실행 결과`,
+    path: fullPath,
+    summary: `exit=${payload.exitCode}, timeout=${payload.killedByTimeout}`
   };
 }
 

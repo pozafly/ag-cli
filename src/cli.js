@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 import { loadConfig, saveSampleConfig } from './config.js';
-import { plan, runBrowserSubagent, saveState } from './orchestrator.js';
+import { plan, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
 
 const program = new Command();
 
@@ -52,6 +52,31 @@ program
     try {
       const config = loadConfig();
       const artifact = await runBrowserSubagent(url, config);
+      console.log(chalk.green(`Artifact saved: ${artifact.path}`));
+      console.log(chalk.cyan(artifact.summary));
+    } catch (err) {
+      console.error(chalk.red(err.message));
+      process.exit(1);
+    }
+  });
+
+program
+  .command('delegate')
+  .description('Delegate a task to external worker CLI (claude/codex)')
+  .requiredOption('-w, --worker <name>', 'worker name: claude|codex')
+  .requiredOption('-p, --prompt <text>', 'task prompt')
+  .option('-t, --timeout <ms>', 'timeout ms', '120000')
+  .action(async (opts) => {
+    try {
+      const config = loadConfig();
+      const artifact = await delegateTaskToWorker(
+        {
+          worker: opts.worker,
+          prompt: opts.prompt,
+          timeoutMs: Number(opts.timeout)
+        },
+        config
+      );
       console.log(chalk.green(`Artifact saved: ${artifact.path}`));
       console.log(chalk.cyan(artifact.summary));
     } catch (err) {

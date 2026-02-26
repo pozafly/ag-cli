@@ -20,12 +20,14 @@ ag init
 export OPENAI_API_KEY=...
 ag run "Build a project scaffold for ..."
 ag browser "https://antigravity.google/"
+ag delegate --worker codex --prompt "이 저장소의 다음 할 일 요약해줘"
 ```
 
 ## 명령어
 - `ag init` : 기본 `ag.config.yaml` 생성
 - `ag run "<objective>"` : 오케스트레이터 플래너 실행
 - `ag browser <url>` : 브라우저 서브에이전트 리서치 실행
+- `ag delegate --worker <claude|codex> --prompt "..."` : 외부 워커 CLI 위임 실행
 
 ## 현재 상태 (MVP)
 - [x] 모델 호출
@@ -34,6 +36,7 @@ ag browser "https://antigravity.google/"
 - [x] Artifact 저장
 - [ ] 멀티 에이전트 병렬 실행
 - [ ] 승인가드(Request Review)
+- [x] 외부 워커(claude/codex CLI) 위임 실행 MVP
 - [ ] 터미널 액션 플래닝/실행 루프
 - [ ] 장기 메모리/지식아이템 누적
 
