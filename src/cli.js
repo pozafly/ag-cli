@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 import { loadConfig, saveSampleConfig } from './config.js';
-import { plan, executeTaskGroups, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
+import { plan, executeTaskGroups, createReviewArtifact, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
 
 const program = new Command();
 
@@ -44,11 +44,13 @@ program
       if (opts.execute) {
         const executed = await executeTaskGroups(state, config, { approveRisky: Boolean(opts.approveRisky) });
         const execPath = saveState(executed, config, 'exec');
+        const review = createReviewArtifact(executed, config);
         console.log(chalk.yellow('\nExecution summary:\n'));
         for (const task of executed.tasks) {
           console.log(`- ${task.id} [${task.assignee}] => ${task.status}`);
         }
         console.log(chalk.green(`\nSaved execution: ${execPath}`));
+        console.log(chalk.green(`Saved review: ${review.path}`));
       }
     } catch (err) {
       console.error(chalk.red(err.message));

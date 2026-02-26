@@ -20,6 +20,10 @@ export const defaultConfig = {
     strategy: 'prompt',
     riskyKeywords: ['rm -rf', 'drop table', 'delete from', 'truncate', 'sudo', 'ssh', 'scp']
   },
+  review: {
+    testCommand: 'npm test --silent',
+    maxDiffChars: 12000
+  },
   browser: {
     headless: true,
     slowMoMs: 0
@@ -40,6 +44,10 @@ export function loadConfig(configPath = 'ag.config.yaml') {
     approval: {
       ...defaultConfig.approval,
       ...(parsed.approval || {})
+    },
+    review: {
+      ...defaultConfig.review,
+      ...(parsed.review || {})
     },
     browser: {
       ...defaultConfig.browser,

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { execSync } from 'node:child_process';
 
 import { askModel } from './llm.js';
 import { browserResearch } from './browser.js';
@@ -219,6 +220,68 @@ export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 
     title: `${worker} 워커 실행 결과`,
     path: fullPath,
     summary: `exit=${payload.exitCode}, timeout=${payload.killedByTimeout}`
+  };
+}
+
+function safeExec(command, options = {}) {
+  try {
+    return {
+      ok: true,
+      output: execSync(command, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        ...options
+      }).trim()
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      output: String(err.stdout || err.stderr || err.message || '').trim()
+    };
+  }
+}
+
+export function createReviewArtifact(state, config) {
+  const outDir = ensureDir(config.artifactsDir);
+  const now = new Date().toISOString();
+  const diff = safeExec('git diff -- .');
+  const status = safeExec('git status --short');
+  const test = safeExec(config.review?.testCommand || 'npm test --silent');
+
+  const markdown = [
+    '# Review Artifact',
+    '',
+    `- sessionId: ${state.sessionId}`,
+    `- generatedAt: ${now}`,
+    '',
+    '## Task Summary',
+    ...state.tasks.map((t) => `- ${t.id} [${t.assignee}] ${t.status} :: ${t.goal}`),
+    '',
+    '## Git Status',
+    '```',
+    status.output || '(clean)',
+    '```',
+    '',
+    '## Test Result',
+    `- command: ${config.review?.testCommand || 'npm test --silent'}`,
+    `- success: ${test.ok}`,
+    '```',
+    test.output || '(no output)',
+    '```',
+    '',
+    '## Diff (truncated)',
+    '```diff',
+    (diff.output || '(no diff)').slice(0, Number(config.review?.maxDiffChars || 12000)),
+    '```'
+  ].join('\n');
+
+  const fullPath = path.join(outDir, `review-${state.sessionId}.md`);
+  fs.writeFileSync(fullPath, markdown, 'utf8');
+
+  return {
+    kind: 'review-artifact',
+    path: fullPath,
+    summary: `review generated (test ok=${test.ok})`
   };
 }
 
