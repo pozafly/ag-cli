@@ -17,3 +17,10 @@
   - 응답 파서를 분리해 `role=` 1순위, 전체 텍스트 포함 매칭 2순위로 안정화했습니다.
   - 1회성 실패/잡음 대응을 위해 동일 프롬프트 재시도(최대 2회)를 추가했습니다.
   - LLM SDK 호출에 timeout/retry 제한을 걸고, `output_text` 비어 있을 때 message content fallback 파싱을 추가했습니다.
+
+## 이슈: 크로스서피스 검증 훅 완성
+- 상태: 완료
+- 코멘트:
+  - `git rev-parse --show-toplevel`로 저장소 루트를 자동 감지해 실행 위치에 덜 민감해졌습니다.
+  - Worker/Browser 표면에 대해 assignee-result 불일치 개수를 검증 항목으로 추가했습니다.
+  - 테스트/실패/보류/불일치 통합 조건으로 `passed` 판정을 생성해 훅 요약에 반영했습니다.
