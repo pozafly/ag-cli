@@ -12,10 +12,12 @@ import {
   delegateTaskToWorker,
   saveState
 } from './orchestrator.js';
+import { createCrossSurfaceVerificationHook } from './cross-surface.js';
 import {
   appendRunRecord,
   assignRunTasks,
   loadAgentManagerState,
+  runManagerCoreLoop,
   saveAgentManagerState,
   summarizeAgentManagerState
 } from './agent-manager.js';
@@ -165,6 +167,49 @@ manager
       });
       console.log(chalk.green(`\nSaved manager: ${statePath}`));
       console.log(chalk.green(`Saved plan: ${planPath}`));
+    } catch (err) {
+      console.error(chalk.red(errorMessage(err)));
+      process.exit(1);
+    }
+  });
+
+manager
+  .command('run')
+  .description('에이전트 매니저 핵심 루프로 배정+실행+집계를 수행')
+  .argument('<objective>', 'high-level objective')
+  .option('--approve-risky', 'approve risky requests detected by approval gate')
+  .action(async (objective: string, opts: { approveRisky?: boolean }) => {
+    try {
+      const config = loadConfig();
+      const managerState = loadAgentManagerState(config);
+      const planned = await plan(objective, config);
+
+      const { state: executed, summary, assignments } = await runManagerCoreLoop(planned, managerState, config, {
+        approveRisky: Boolean(opts.approveRisky)
+      });
+
+      const runRecord = {
+        runId: planned.sessionId,
+        createdAt: new Date().toISOString(),
+        objective,
+        assignmentCount: assignments.length
+      };
+      const nextState = appendRunRecord(managerState, runRecord);
+      const statePath = saveAgentManagerState(nextState, config);
+      const execPath = saveState(executed, config, 'manager-exec');
+      const review = createReviewArtifact(executed, config);
+      const crossSurface = createCrossSurfaceVerificationHook(executed, config);
+
+      console.log(chalk.cyan(`\nSession ${planned.sessionId}`));
+      console.log(`- 총 태스크: ${summary.total}`);
+      console.log(`- 완료: ${summary.done}, 실패: ${summary.failed}, 보류: ${summary.blocked}`);
+      summary.byWorker.forEach((agent) => {
+        console.log(`- worker=${agent.worker} assigned=${agent.assigned} done=${agent.done} failed=${agent.failed} blocked=${agent.blocked}`);
+      });
+      console.log(chalk.green(`\nSaved manager: ${statePath}`));
+      console.log(chalk.green(`Saved execution: ${execPath}`));
+      console.log(chalk.green(`Saved review: ${review.path}`));
+      console.log(chalk.green(`Saved cross-surface hook: ${crossSurface.path}`));
     } catch (err) {
       console.error(chalk.red(errorMessage(err)));
       process.exit(1);

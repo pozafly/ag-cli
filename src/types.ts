@@ -85,7 +85,7 @@ export interface BrowserResearchResult {
   links: string[];
 }
 
-export type ArtifactKind = 'browser-research' | 'worker-run' | 'review-artifact';
+export type ArtifactKind = 'browser-research' | 'worker-run' | 'review-artifact' | 'cross-surface-check';
 
 export interface Artifact {
   kind: ArtifactKind;
