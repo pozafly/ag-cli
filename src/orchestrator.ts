@@ -7,13 +7,23 @@ import { askModel } from './llm.js';
 import { browserResearch } from './browser.js';
 import { runWorkerTask } from './workers.js';
 import { resolveApiKey, ensureDir } from './config.js';
+import { findRiskyKeyword } from './risk.js';
+import type {
+  AppConfig,
+  Artifact,
+  BrowserResearchResult,
+  ExecuteOptions,
+  RunState,
+  TaskGroup,
+  WorkerName
+} from './types.js';
 
 const SYSTEM_PROMPT = `You are an autonomous software orchestrator inspired by agent-first IDEs.
 Return concise, actionable output.
 When planning: produce numbered task groups.
 When executing: report completed, failed, next actions.`;
 
-function inferAssignee(goal, defaultWorker = 'codex') {
+function inferAssignee(goal: string, defaultWorker: WorkerName = 'codex'): WorkerName {
   const text = goal.toLowerCase();
   if (text.includes('browser') || text.includes('웹') || text.includes('사이트') || text.includes('url')) {
     return 'browser';
@@ -23,12 +33,12 @@ function inferAssignee(goal, defaultWorker = 'codex') {
   return defaultWorker;
 }
 
-function extractUrl(goal) {
+function extractUrl(goal: string): string | null {
   const match = goal.match(/https?:\/\/\S+/i);
-  return match ? match[0] : null;
+  return match?.[0] ?? null;
 }
 
-export async function plan(objective, config) {
+export async function plan(objective: string, config: AppConfig): Promise<RunState> {
   const sessionId = randomUUID().slice(0, 8);
   const apiKey = resolveApiKey(config);
 
@@ -45,11 +55,11 @@ export async function plan(objective, config) {
     .filter(Boolean)
     .slice(0, 8);
 
-  const tasks = lines.map((goal, idx) => ({
+  const tasks: TaskGroup[] = lines.map((goal, idx) => ({
     id: `TG-${idx + 1}`,
     goal,
     status: 'pending',
-    assignee: inferAssignee(goal, config.worker?.defaultWorker || 'codex'),
+    assignee: inferAssignee(goal, config.worker.defaultWorker),
     notes: []
   }));
 
@@ -64,16 +74,10 @@ export async function plan(objective, config) {
   };
 }
 
-function findRiskyKeyword(goal, config) {
-  const list = config.approval?.riskyKeywords || [];
-  const text = goal.toLowerCase();
-  return list.find((k) => text.includes(String(k).toLowerCase())) || null;
-}
-
-async function executeTask(task, config, options = {}) {
+async function executeTask(task: TaskGroup, config: AppConfig, options: ExecuteOptions = {}): Promise<TaskGroup> {
   const startedAt = new Date().toISOString();
 
-  if (config.approval?.enabled) {
+  if (config.approval.enabled) {
     const risky = findRiskyKeyword(task.goal, config);
     if (risky && !options.approveRisky) {
       return {
@@ -102,10 +106,7 @@ async function executeTask(task, config, options = {}) {
       };
     }
 
-    const data = await browserResearch(url, {
-      headless: config.browser.headless,
-      slowMoMs: config.browser.slowMoMs
-    });
+    const data = await browserResearch(url, config.browser);
 
     return {
       ...task,
@@ -144,25 +145,30 @@ async function executeTask(task, config, options = {}) {
   };
 }
 
-export async function executeTaskGroups(state, config, options = {}) {
-  const queue = [...state.tasks];
-  const poolSize = Math.max(1, Number(config.worker?.poolSize || 1));
-  const running = new Set();
-  const completed = [];
+export async function executeTaskGroups(state: RunState, config: AppConfig, options: ExecuteOptions = {}): Promise<RunState> {
+  const queue: TaskGroup[] = [...state.tasks];
+  const poolSize = Math.max(1, config.worker.poolSize);
+  const running = new Set<Promise<void>>();
+  const completed: TaskGroup[] = [];
 
-  const launchOne = async (task) => {
+  const launchOne = (task: TaskGroup): void => {
     const p = executeTask(task, config, options)
-      .then((result) => completed.push(result))
-      .finally(() => running.delete(p));
+      .then((result) => {
+        completed.push(result);
+      })
+      .finally(() => {
+        running.delete(p);
+      });
     running.add(p);
   };
 
-  while (queue.length || running.size) {
-    while (queue.length && running.size < poolSize) {
-      await launchOne(queue.shift());
+  while (queue.length > 0 || running.size > 0) {
+    while (queue.length > 0 && running.size < poolSize) {
+      const task = queue.shift();
+      if (task) launchOne(task);
     }
-    if (running.size) {
-      await Promise.race(running);
+    if (running.size > 0) {
+      await Promise.race([...running]);
     }
   }
 
@@ -178,11 +184,8 @@ export async function executeTaskGroups(state, config, options = {}) {
   };
 }
 
-export async function runBrowserSubagent(url, config) {
-  const data = await browserResearch(url, {
-    headless: config.browser.headless,
-    slowMoMs: config.browser.slowMoMs
-  });
+export async function runBrowserSubagent(url: string, config: AppConfig): Promise<Artifact> {
+  const data: BrowserResearchResult = await browserResearch(url, config.browser);
 
   const outDir = ensureDir(config.artifactsDir);
   const filename = `browser-research-${Date.now()}.json`;
@@ -198,7 +201,13 @@ export async function runBrowserSubagent(url, config) {
   };
 }
 
-export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 }, config) {
+interface DelegateArgs {
+  worker: WorkerName;
+  prompt: string;
+  timeoutMs?: number;
+}
+
+export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 }: DelegateArgs, config: AppConfig): Promise<Artifact> {
   const result = await runWorkerTask({ worker, prompt, timeoutMs });
   const outDir = ensureDir(config.artifactsDir);
   const fullPath = path.join(outDir, `worker-${worker}-${Date.now()}.json`);
@@ -223,30 +232,39 @@ export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 
   };
 }
 
-function safeExec(command, options = {}) {
+interface ExecResult {
+  ok: boolean;
+  output: string;
+}
+
+function safeExec(command: string, options: Parameters<typeof execSync>[1] = {}): ExecResult {
   try {
     return {
       ok: true,
-      output: execSync(command, {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        ...options
-      }).trim()
+      output: String(
+        execSync(command, {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          ...options
+        })
+      ).trim()
     };
   } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; message?: string };
     return {
       ok: false,
-      output: String(err.stdout || err.stderr || err.message || '').trim()
+      output: String(e.stdout ?? e.stderr ?? e.message ?? '').trim()
     };
   }
 }
 
-export function createReviewArtifact(state, config) {
+export function createReviewArtifact(state: RunState, config: AppConfig): Artifact {
   const outDir = ensureDir(config.artifactsDir);
   const now = new Date().toISOString();
   const diff = safeExec('git diff -- .');
   const status = safeExec('git status --short');
-  const test = safeExec(config.review?.testCommand || 'npm test --silent');
+  const testCommand = config.review.testCommand || 'npm test --silent';
+  const test = safeExec(testCommand);
 
   const markdown = [
     '# Review Artifact',
@@ -263,7 +281,7 @@ export function createReviewArtifact(state, config) {
     '```',
     '',
     '## Test Result',
-    `- command: ${config.review?.testCommand || 'npm test --silent'}`,
+    `- command: ${testCommand}`,
     `- success: ${test.ok}`,
     '```',
     test.output || '(no output)',
@@ -271,7 +289,7 @@ export function createReviewArtifact(state, config) {
     '',
     '## Diff (truncated)',
     '```diff',
-    (diff.output || '(no diff)').slice(0, Number(config.review?.maxDiffChars || 12000)),
+    (diff.output || '(no diff)').slice(0, config.review.maxDiffChars),
     '```'
   ].join('\n');
 
@@ -285,7 +303,7 @@ export function createReviewArtifact(state, config) {
   };
 }
 
-export function saveState(state, config, suffix = '') {
+export function saveState(state: RunState, config: AppConfig, suffix = ''): string {
   const outDir = ensureDir(config.artifactsDir);
   const tail = suffix ? `-${suffix}` : '';
   const fullPath = path.join(outDir, `run-${state.sessionId}${tail}.json`);

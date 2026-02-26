@@ -2,21 +2,26 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
+import { errorMessage } from './errors.js';
 import { loadConfig, saveSampleConfig } from './config.js';
-import { plan, executeTaskGroups, createReviewArtifact, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
+import {
+  plan,
+  executeTaskGroups,
+  createReviewArtifact,
+  runBrowserSubagent,
+  delegateTaskToWorker,
+  saveState
+} from './orchestrator.js';
 
 const program = new Command();
 
-program
-  .name('ag')
-  .description('Antigravity-style orchestrator CLI (Node.js)')
-  .version('0.2.0');
+program.name('ag').description('Antigravity-style orchestrator CLI (Node.js)').version('0.3.0');
 
 program
   .command('init')
   .description('Create default ag.config.yaml')
   .option('-c, --config <path>', 'config path', 'ag.config.yaml')
-  .action((opts) => {
+  .action((opts: { config: string }) => {
     saveSampleConfig(opts.config);
     console.log(chalk.green(`Wrote ${opts.config}`));
   });
@@ -27,7 +32,7 @@ program
   .argument('<objective>', 'high-level objective')
   .option('-e, --execute', 'execute planned task groups with worker pool')
   .option('--approve-risky', 'approve risky requests detected by approval gate')
-  .action(async (objective, opts) => {
+  .action(async (objective: string, opts: { execute?: boolean; approveRisky?: boolean }) => {
     try {
       const config = loadConfig();
       const state = await plan(objective, config);
@@ -53,7 +58,7 @@ program
         console.log(chalk.green(`Saved review: ${review.path}`));
       }
     } catch (err) {
-      console.error(chalk.red(err.message));
+      console.error(chalk.red(errorMessage(err)));
       process.exit(1);
     }
   });
@@ -62,14 +67,14 @@ program
   .command('browser')
   .description('Run browser subagent research for URL')
   .argument('<url>', 'target url')
-  .action(async (url) => {
+  .action(async (url: string) => {
     try {
       const config = loadConfig();
       const artifact = await runBrowserSubagent(url, config);
       console.log(chalk.green(`Artifact saved: ${artifact.path}`));
       console.log(chalk.cyan(artifact.summary));
     } catch (err) {
-      console.error(chalk.red(err.message));
+      console.error(chalk.red(errorMessage(err)));
       process.exit(1);
     }
   });
@@ -80,7 +85,7 @@ program
   .requiredOption('-w, --worker <name>', 'worker name: claude|codex')
   .requiredOption('-p, --prompt <text>', 'task prompt')
   .option('-t, --timeout <ms>', 'timeout ms', '120000')
-  .action(async (opts) => {
+  .action(async (opts: { worker: string; prompt: string; timeout: string }) => {
     try {
       const config = loadConfig();
       const artifact = await delegateTaskToWorker(
@@ -94,7 +99,7 @@ program
       console.log(chalk.green(`Artifact saved: ${artifact.path}`));
       console.log(chalk.cyan(artifact.summary));
     } catch (err) {
-      console.error(chalk.red(err.message));
+      console.error(chalk.red(errorMessage(err)));
       process.exit(1);
     }
   });
