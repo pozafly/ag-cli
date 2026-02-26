@@ -61,6 +61,7 @@ ag manager run "하이브리드 라우팅 실행" --routing llm-hybrid
 - 에이전트 매니저 상태: `artifacts/agent-manager-v1.json`
 - 플랜 저장: `artifacts/run-<session>-plan.json`, `artifacts/run-<session>-manager-plan.json`
 - 실행 저장: `artifacts/run-<session>-exec.json`, `artifacts/run-<session>-manager-exec.json`
+- 라우팅 배정 저장: `artifacts/run-<session>-assignments.json`
 - 워커/브라우저 결과: `artifacts/worker-*.json`, `artifacts/browser-research-*.json`
 - 리뷰 보고서: `artifacts/review-<session>.md`
 - 크로스서피스 검증 훅: `artifacts/cross-surface-<session>.md`

@@ -51,3 +51,6 @@
 - 코멘트(23:32):
   - `ag manager status` 출력에 `기본 라우팅 전략`을 추가해 현재 운영 모드를 즉시 확인할 수 있게 했습니다.
   - README 명령 예시에 status 출력 의미를 반영해 운용 문맥을 보강했습니다.
+- 코멘트(23:33):
+  - manager assign/run 결과에 `run-<session>-assignments.json` 아티팩트를 추가해 라우팅 결정 추적성을 강화했습니다.
+  - 콘솔 출력에도 assignments 저장 경로를 노출해 운영자가 즉시 산출물을 확인할 수 있도록 개선했습니다.

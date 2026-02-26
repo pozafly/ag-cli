@@ -19,6 +19,7 @@ import {
   loadAgentManagerState,
   runManagerCoreLoop,
   saveAgentManagerState,
+  saveAssignmentsArtifact,
   summarizeAgentManagerState
 } from './agent-manager.js';
 
@@ -163,6 +164,7 @@ manager
       const nextState = appendRunRecord(managerState, runRecord);
       const statePath = saveAgentManagerState(nextState, config);
       const planPath = saveState(planned, config, 'manager-plan');
+      const assignmentPath = saveAssignmentsArtifact(planned.sessionId, assignments, config);
 
       console.log(chalk.cyan(`\nSession ${planned.sessionId}`));
       console.log(`- routing=${routing}`);
@@ -171,6 +173,7 @@ manager
       });
       console.log(chalk.green(`\nSaved manager: ${statePath}`));
       console.log(chalk.green(`Saved plan: ${planPath}`));
+      console.log(chalk.green(`Saved assignments: ${assignmentPath}`));
     } catch (err) {
       console.error(chalk.red(errorMessage(err)));
       process.exit(1);
@@ -209,6 +212,7 @@ manager
       const nextState = appendRunRecord(managerState, runRecord);
       const statePath = saveAgentManagerState(nextState, config);
       const execPath = saveState(executed, config, 'manager-exec');
+      const assignmentPath = saveAssignmentsArtifact(planned.sessionId, assignments, config);
       const review = createReviewArtifact(executed, config);
       const crossSurface = createCrossSurfaceVerificationHook(executed, config);
 
@@ -231,6 +235,7 @@ manager
       });
       console.log(chalk.green(`\nSaved manager: ${statePath}`));
       console.log(chalk.green(`Saved execution: ${execPath}`));
+      console.log(chalk.green(`Saved assignments: ${assignmentPath}`));
       console.log(chalk.green(`Saved review: ${review.path}`));
       console.log(chalk.green(`Saved cross-surface hook: ${crossSurface.path}`));
     } catch (err) {

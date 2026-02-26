@@ -246,6 +246,25 @@ export function appendRunRecord(managerState: AgentManagerState, run: AgentRunRe
   };
 }
 
+export function saveAssignmentsArtifact(sessionId: string, assignments: TaskAssignment[], config: AppConfig): string {
+  const outDir = ensureDir(config.artifactsDir);
+  const file = path.join(outDir, `run-${sessionId}-assignments.json`);
+  fs.writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        sessionId,
+        createdAt: new Date().toISOString(),
+        assignments
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+  return file;
+}
+
 export interface AgentRuntime {
   worker: WorkerName;
   status: 'idle' | 'running';
