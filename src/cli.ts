@@ -20,7 +20,8 @@ import {
   runManagerCoreLoop,
   saveAgentManagerState,
   saveAssignmentsArtifact,
-  summarizeAgentManagerState
+  summarizeAgentManagerState,
+  normalizeRoutingStrategy
 } from './agent-manager.js';
 
 const program = new Command();
@@ -134,7 +135,8 @@ manager
     const config = loadConfig();
     const state = loadAgentManagerState(config);
     console.log(chalk.cyan(summarizeAgentManagerState(state)));
-    console.log(`기본 라우팅 전략: ${config.manager.routingStrategy}`);
+    const normalized = normalizeRoutingStrategy(config.manager.routingStrategy);
+    console.log(`기본 라우팅 전략: ${normalized}`);
   });
 
 manager
@@ -147,7 +149,7 @@ manager
       const config = loadConfig();
       const managerState = loadAgentManagerState(config);
       const planned = await plan(objective, config);
-      const routing = opts.routing ?? config.manager.routingStrategy;
+      const routing = normalizeRoutingStrategy(opts.routing ?? config.manager.routingStrategy);
       const assignments = await assignRunTasksByStrategy(planned, managerState, config, routing);
 
       for (const task of planned.tasks) {
@@ -191,7 +193,7 @@ manager
       const config = loadConfig();
       const managerState = loadAgentManagerState(config);
       const planned = await plan(objective, config);
-      const routing = opts.routing ?? config.manager.routingStrategy;
+      const routing = normalizeRoutingStrategy(opts.routing ?? config.manager.routingStrategy);
 
       const { state: executed, summary, assignments } = await runManagerCoreLoop(
         planned,

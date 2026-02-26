@@ -1,10 +1,14 @@
 [Slack 보고용 요약]
-- 에이전트 매니저 v1 1차 구현 완료
-- 추가 사항
-  - 역할 프로필/우선순위/키워드 라우팅 도입
-  - 매니저 상태 파일(`artifacts/agent-manager-v1.json`) 저장
-  - CLI: `ag manager init|status|assign` 추가
-  - manager-plan 아티팩트 저장
-- 기대 효과
-  - Task Group별 역할 분리의 시작점 확보
-  - 이후 LLM 라우팅/크로스서피스 루프 강화 작업을 바로 이어갈 수 있는 구조 마련
+- 00:00 보고
+  - 에이전트 매니저 상태 파일(`agent-manager-v1.json`)이 손상/부분 데이터여도 실행이 멈추지 않도록 로더 정규화/복구 로직 반영.
+  - 라우팅 전략 입력(`--routing`, config) 오타/비정상 값은 `llm-hybrid`로 자동 정규화.
+  - task 배정 근거에 `score`, `keywordHits`를 추가해 추적성 강화.
+
+- 00:10 보고
+  - `ag manager status`도 정규화된 전략 값을 출력하도록 통일.
+  - README/이슈 로그/상태 로그 동기화 완료.
+  - 빌드 검증(`npm run build`) 통과, 커밋/푸시 단계 진행 예정.
+
+- 00:20 보고(변경 없음 포함)
+  - 코드 변경 없음.
+  - 최종 diff 점검 후 완료 단위 커밋/푸시/이슈 코멘트만 남은 상태.

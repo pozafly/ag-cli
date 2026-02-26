@@ -54,3 +54,11 @@
 - 코멘트(23:33):
   - manager assign/run 결과에 `run-<session>-assignments.json` 아티팩트를 추가해 라우팅 결정 추적성을 강화했습니다.
   - 콘솔 출력에도 assignments 저장 경로를 노출해 운영자가 즉시 산출물을 확인할 수 있도록 개선했습니다.
+
+## 이슈: 매니저 상태 복원력/라우팅 정규화 강화
+- 상태: 완료
+- 코멘트:
+  - `agent-manager-v1.json` 파싱 실패/부분 손상 상황에서 기본 상태로 안전 복구하도록 로더를 보강했습니다.
+  - profiles/runs를 최소 필드 기준으로 정규화해 잘못된 레코드가 있어도 실행이 중단되지 않도록 했습니다.
+  - 라우팅 전략 입력값을 `heuristic|llm-hybrid`로 정규화하는 `normalizeRoutingStrategy`를 도입했습니다.
+  - `assignTask` reason에 `score`/`keywordHits`를 함께 남겨 라우팅 근거 추적성을 강화했습니다.

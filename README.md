@@ -55,7 +55,7 @@ ag manager run "하이브리드 라우팅 실행" --routing llm-hybrid
 - `approval.enabled`, `approval.riskyKeywords`: 승인 게이트 정책
 - `review.testCommand`, `review.maxDiffChars`: 리뷰 아티팩트 생성 정책
 - `browser.headless`, `browser.slowMoMs`: 브라우저 실행 옵션
-- `manager.routingStrategy`: `heuristic` 또는 `llm-hybrid` 라우팅 전략 선택
+- `manager.routingStrategy`: `heuristic` 또는 `llm-hybrid` 라우팅 전략 선택(오타/알 수 없는 값은 `llm-hybrid`로 자동 정규화)
 
 ## 아티팩트 흐름
 - 에이전트 매니저 상태: `artifacts/agent-manager-v1.json`

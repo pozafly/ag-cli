@@ -23,6 +23,8 @@ export interface TaskAssignment {
   profileId: string;
   worker: WorkerName;
   reason: string;
+  score?: number;
+  keywordHits?: string[];
 }
 
 export interface AgentRunRecord {
@@ -40,6 +42,15 @@ export interface AgentManagerState {
 }
 
 const MANAGER_FILENAME = 'agent-manager-v1.json';
+
+export type RoutingStrategy = 'heuristic' | 'llm-hybrid';
+
+export function normalizeRoutingStrategy(input?: string | null): RoutingStrategy {
+  if (!input) return 'llm-hybrid';
+  const lowered = input.trim().toLowerCase();
+  if (lowered === 'heuristic') return 'heuristic';
+  return 'llm-hybrid';
+}
 
 function defaultProfiles(defaultWorker: WorkerName): AgentProfile[] {
   return [
@@ -94,8 +105,38 @@ export function loadAgentManagerState(config: AppConfig): AgentManagerState {
     };
   }
 
-  const raw = fs.readFileSync(file, 'utf8');
-  return JSON.parse(raw) as AgentManagerState;
+  try {
+    const raw = fs.readFileSync(file, 'utf8');
+    const parsed = JSON.parse(raw) as Partial<AgentManagerState>;
+    const validProfiles = Array.isArray(parsed.profiles)
+      ? parsed.profiles.filter((p): p is AgentProfile => Boolean(p?.id && p?.role && p?.worker))
+      : [];
+    const profiles = validProfiles.length > 0 ? validProfiles : defaultProfiles(config.worker.defaultWorker);
+    const runs = Array.isArray(parsed.runs)
+      ? parsed.runs
+          .filter((r): r is AgentRunRecord => Boolean(r?.runId && r?.objective))
+          .map((r) => ({
+            runId: r.runId,
+            createdAt: r.createdAt ?? new Date().toISOString(),
+            objective: r.objective,
+            assignmentCount: Number.isFinite(r.assignmentCount) ? r.assignmentCount : 0
+          }))
+      : [];
+
+    return {
+      version: 1,
+      updatedAt: parsed.updatedAt ?? new Date().toISOString(),
+      profiles,
+      runs
+    };
+  } catch {
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      profiles: defaultProfiles(config.worker.defaultWorker),
+      runs: []
+    };
+  }
 }
 
 export function saveAgentManagerState(state: AgentManagerState, config: AppConfig): string {
@@ -108,10 +149,17 @@ export function saveAgentManagerState(state: AgentManagerState, config: AppConfi
   return file;
 }
 
-function profileScore(profile: AgentProfile, goal: string): number {
+function matchedKeywords(profile: AgentProfile, goal: string): string[] {
   const text = goal.toLowerCase();
-  const keywordHits = profile.routingKeywords.filter((kw) => text.includes(kw.toLowerCase())).length;
-  return profile.priority + keywordHits * 20;
+  return profile.routingKeywords.filter((kw) => text.includes(kw.toLowerCase()));
+}
+
+function profileScore(profile: AgentProfile, goal: string): { score: number; keywordHits: string[] } {
+  const keywordHits = matchedKeywords(profile, goal);
+  return {
+    score: profile.priority + keywordHits.length * 20,
+    keywordHits
+  };
 }
 
 function fallbackProfile(profiles: AgentProfile[], defaultWorker: WorkerName): AgentProfile {
@@ -127,16 +175,22 @@ function fallbackProfile(profiles: AgentProfile[], defaultWorker: WorkerName): A
 
 export function assignTask(task: TaskGroup, profiles: AgentProfile[], defaultWorker: WorkerName): TaskAssignment {
   const sorted = profiles
-    .map((profile) => ({ profile, score: profileScore(profile, task.goal) }))
+    .map((profile) => ({ profile, ...profileScore(profile, task.goal) }))
     .sort((a, b) => b.score - a.score);
 
-  const selected = sorted[0]?.profile ?? fallbackProfile(profiles, defaultWorker);
+  const selectedRow = sorted[0];
+  const selected = selectedRow?.profile ?? fallbackProfile(profiles, defaultWorker);
+  const hits = selectedRow?.keywordHits ?? [];
+  const score = selectedRow?.score ?? selected.priority;
+
   return {
     taskId: task.id,
     taskGoal: task.goal,
     profileId: selected.id,
     worker: selected.worker,
-    reason: `role=${selected.role}, priority=${selected.priority}`
+    reason: `role=${selected.role}, priority=${selected.priority}, score=${score}, keywordHits=${hits.join('|') || 'none'}`,
+    score,
+    keywordHits: hits
   };
 }
 
@@ -233,7 +287,8 @@ export async function assignRunTasksByStrategy(
   config: AppConfig,
   strategy: string
 ): Promise<TaskAssignment[]> {
-  if (strategy === 'heuristic') {
+  const normalized = normalizeRoutingStrategy(strategy);
+  if (normalized === 'heuristic') {
     return assignRunTasks(state, managerState, config);
   }
   return assignRunTasksWithLLM(state, managerState, config);

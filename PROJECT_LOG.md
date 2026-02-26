@@ -21,3 +21,11 @@
   - LLM 역할 라우팅 안정화: `role=` 포맷 파서, 2회 재시도, 응답 파싱 실패 시 안전 폴백
   - 크로스서피스 검증 훅 보강: 저장소 루트 자동 감지, 표면별 불일치 검증, pass/fail 판정 노출
   - 10분 단위 중간보고용 상태 기록 파일 추가(`STATUS_2026-02-26.md`)
+  - 라우팅 전략 설정/옵션화: `manager.routingStrategy`, `ag manager assign/run --routing`
+  - 라우팅 관측성 강화: `routing-summary(llm/fallback/heuristic)`를 콘솔/아티팩트에 동시 기록
+  - 운영 가시성 강화: `ag manager status`에 마지막 실행/역할 분포/기본 라우팅 전략 노출
+  - 추적성 강화: `run-<session>-assignments.json` 아티팩트 저장
+- 2026-02-27 00:00 KST 추가 개선:
+  - 매니저 상태 복원력 강화: 손상/부분 JSON 로딩 시 필드 정규화 + 기본 프로필 자동 복구
+  - 라우팅 전략 정규화: 비정상 값 입력 시 `llm-hybrid` 강제
+  - 라우팅 근거 가시화: assignment reason에 score/keywordHits 기록
