@@ -12,6 +12,13 @@ import {
   delegateTaskToWorker,
   saveState
 } from './orchestrator.js';
+import {
+  appendRunRecord,
+  assignRunTasks,
+  loadAgentManagerState,
+  saveAgentManagerState,
+  summarizeAgentManagerState
+} from './agent-manager.js';
 
 const program = new Command();
 
@@ -99,6 +106,65 @@ program
       );
       console.log(chalk.green(`Artifact saved: ${artifact.path}`));
       console.log(chalk.cyan(artifact.summary));
+    } catch (err) {
+      console.error(chalk.red(errorMessage(err)));
+      process.exit(1);
+    }
+  });
+
+const manager = program.command('manager').description('에이전트 매니저 v1 제어');
+
+manager
+  .command('init')
+  .description('에이전트 매니저 상태 파일 초기화')
+  .action(() => {
+    const config = loadConfig();
+    const state = loadAgentManagerState(config);
+    const savedPath = saveAgentManagerState(state, config);
+    console.log(chalk.green(`초기화 완료: ${savedPath}`));
+  });
+
+manager
+  .command('status')
+  .description('에이전트 프로필/실행 기록 상태 확인')
+  .action(() => {
+    const config = loadConfig();
+    const state = loadAgentManagerState(config);
+    console.log(chalk.cyan(summarizeAgentManagerState(state)));
+  });
+
+manager
+  .command('assign')
+  .description('목표를 플래닝하고 에이전트 매니저 라우팅 결과를 확인')
+  .argument('<objective>', 'high-level objective')
+  .action(async (objective: string) => {
+    try {
+      const config = loadConfig();
+      const managerState = loadAgentManagerState(config);
+      const planned = await plan(objective, config);
+      const assignments = assignRunTasks(planned, managerState, config);
+
+      for (const task of planned.tasks) {
+        const matched = assignments.find((a) => a.taskId === task.id);
+        if (matched) task.assignee = matched.worker;
+      }
+
+      const runRecord = {
+        runId: planned.sessionId,
+        createdAt: new Date().toISOString(),
+        objective,
+        assignmentCount: assignments.length
+      };
+      const nextState = appendRunRecord(managerState, runRecord);
+      const statePath = saveAgentManagerState(nextState, config);
+      const planPath = saveState(planned, config, 'manager-plan');
+
+      console.log(chalk.cyan(`\nSession ${planned.sessionId}`));
+      assignments.forEach((row) => {
+        console.log(`- ${row.taskId}: ${row.profileId} -> ${row.worker} (${row.reason})`);
+      });
+      console.log(chalk.green(`\nSaved manager: ${statePath}`));
+      console.log(chalk.green(`Saved plan: ${planPath}`));
     } catch (err) {
       console.error(chalk.red(errorMessage(err)));
       process.exit(1);
