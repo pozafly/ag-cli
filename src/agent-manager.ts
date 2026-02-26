@@ -217,10 +217,26 @@ export async function assignRunTasksWithLLM(
       continue;
     }
 
-    rows.push(assignTask(task, managerState.profiles, config.worker.defaultWorker));
+    const fallback = assignTask(task, managerState.profiles, config.worker.defaultWorker);
+    rows.push({
+      ...fallback,
+      reason: `llm-fallback -> ${fallback.reason}`
+    });
   }
 
   return rows;
+}
+
+export async function assignRunTasksByStrategy(
+  state: RunState,
+  managerState: AgentManagerState,
+  config: AppConfig,
+  strategy: string
+): Promise<TaskAssignment[]> {
+  if (strategy === 'heuristic') {
+    return assignRunTasks(state, managerState, config);
+  }
+  return assignRunTasksWithLLM(state, managerState, config);
 }
 
 export function appendRunRecord(managerState: AgentManagerState, run: AgentRunRecord): AgentManagerState {
@@ -341,9 +357,10 @@ export async function runManagerCoreLoop(
   planned: RunState,
   managerState: AgentManagerState,
   config: AppConfig,
-  options: ExecuteOptions = {}
+  options: ExecuteOptions = {},
+  routingStrategy: string = config.manager.routingStrategy
 ): Promise<{ state: RunState; summary: ManagerLoopSummary; assignments: TaskAssignment[] }> {
-  const assignments = await assignRunTasksWithLLM(planned, managerState, config);
+  const assignments = await assignRunTasksByStrategy(planned, managerState, config, routingStrategy);
   const assignmentMap = new Map(assignments.map((x) => [x.taskId, x]));
   const roleByProfileId = new Map(managerState.profiles.map((x) => [x.id, x.role]));
   const queue: TaskGroup[] = planned.tasks.map((task) => {

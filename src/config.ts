@@ -32,6 +32,9 @@ export const defaultConfig: AppConfig = {
   browser: {
     headless: true,
     slowMoMs: 0
+  },
+  manager: {
+    routingStrategy: 'llm-hybrid'
   }
 };
 
@@ -45,7 +48,8 @@ export function loadConfig(configPath = 'ag.config.yaml'): AppConfig {
     worker: { ...defaultConfig.worker, ...(parsed.worker ?? {}) },
     approval: { ...defaultConfig.approval, ...(parsed.approval ?? {}) },
     review: { ...defaultConfig.review, ...(parsed.review ?? {}) },
-    browser: { ...defaultConfig.browser, ...(parsed.browser ?? {}) }
+    browser: { ...defaultConfig.browser, ...(parsed.browser ?? {}) },
+    manager: { ...defaultConfig.manager, ...(parsed.manager ?? {}) }
   };
 }
 

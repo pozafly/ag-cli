@@ -15,7 +15,7 @@ import {
 import { createCrossSurfaceVerificationHook } from './cross-surface.js';
 import {
   appendRunRecord,
-  assignRunTasks,
+  assignRunTasksByStrategy,
   loadAgentManagerState,
   runManagerCoreLoop,
   saveAgentManagerState,
@@ -139,12 +139,14 @@ manager
   .command('assign')
   .description('목표를 플래닝하고 에이전트 매니저 라우팅 결과를 확인')
   .argument('<objective>', 'high-level objective')
-  .action(async (objective: string) => {
+  .option('--routing <strategy>', 'routing strategy: heuristic|llm-hybrid')
+  .action(async (objective: string, opts: { routing?: string }) => {
     try {
       const config = loadConfig();
       const managerState = loadAgentManagerState(config);
       const planned = await plan(objective, config);
-      const assignments = assignRunTasks(planned, managerState, config);
+      const routing = opts.routing ?? config.manager.routingStrategy;
+      const assignments = await assignRunTasksByStrategy(planned, managerState, config, routing);
 
       for (const task of planned.tasks) {
         const matched = assignments.find((a) => a.taskId === task.id);
@@ -162,6 +164,7 @@ manager
       const planPath = saveState(planned, config, 'manager-plan');
 
       console.log(chalk.cyan(`\nSession ${planned.sessionId}`));
+      console.log(`- routing=${routing}`);
       assignments.forEach((row) => {
         console.log(`- ${row.taskId}: ${row.profileId} -> ${row.worker} (${row.reason})`);
       });
@@ -178,15 +181,23 @@ manager
   .description('에이전트 매니저 핵심 루프로 배정+실행+집계를 수행')
   .argument('<objective>', 'high-level objective')
   .option('--approve-risky', 'approve risky requests detected by approval gate')
-  .action(async (objective: string, opts: { approveRisky?: boolean }) => {
+  .option('--routing <strategy>', 'routing strategy: heuristic|llm-hybrid')
+  .action(async (objective: string, opts: { approveRisky?: boolean; routing?: string }) => {
     try {
       const config = loadConfig();
       const managerState = loadAgentManagerState(config);
       const planned = await plan(objective, config);
+      const routing = opts.routing ?? config.manager.routingStrategy;
 
-      const { state: executed, summary, assignments } = await runManagerCoreLoop(planned, managerState, config, {
-        approveRisky: Boolean(opts.approveRisky)
-      });
+      const { state: executed, summary, assignments } = await runManagerCoreLoop(
+        planned,
+        managerState,
+        config,
+        {
+          approveRisky: Boolean(opts.approveRisky)
+        },
+        routing
+      );
 
       const runRecord = {
         runId: planned.sessionId,
@@ -201,6 +212,7 @@ manager
       const crossSurface = createCrossSurfaceVerificationHook(executed, config);
 
       console.log(chalk.cyan(`\nSession ${planned.sessionId}`));
+      console.log(`- routing=${routing}`);
       console.log(`- 총 태스크: ${summary.total}`);
       console.log(`- 완료: ${summary.done}, 실패: ${summary.failed}, 보류: ${summary.blocked}`);
       summary.byWorker.forEach((agent) => {

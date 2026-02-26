@@ -32,3 +32,15 @@
   - `git rev-parse --show-toplevel`로 저장소 루트를 자동 감지해 실행 위치에 덜 민감해졌습니다.
   - Worker/Browser 표면에 대해 assignee-result 불일치 개수를 검증 항목으로 추가했습니다.
   - 테스트/실패/보류/불일치 통합 조건으로 `passed` 판정을 생성해 훅 요약에 반영했습니다.
+
+## 이슈: 30분 백그라운드 자율개선 라운드(23:22 KST 시작)
+- 상태: 진행중
+- 시작 계획:
+  - manager assign/run에 LLM 하이브리드 라우팅 옵션 연결
+  - 라우팅 폴백 사유를 assignment reason/아티팩트에 명시
+  - 10분 간격 WORKLOG 갱신 + 완료 단위 커밋/푸시/코멘트
+- 코멘트(23:24):
+  - `manager.routingStrategy` 설정(`llm-hybrid` 기본값) 추가.
+  - `ag manager assign/run`에 `--routing` 옵션을 연결해 전략 전환 가능.
+  - LLM 라우팅 실패 시 `llm-fallback -> ...` 이유를 남기도록 assignment reason 확장.
+  - README에 전략 사용 예시/설정 키 문서화 반영.

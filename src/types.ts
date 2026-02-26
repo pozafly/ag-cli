@@ -24,6 +24,10 @@ export interface BrowserConfig {
   slowMoMs: number;
 }
 
+export interface ManagerConfig {
+  routingStrategy: 'heuristic' | 'llm-hybrid' | string;
+}
+
 export interface AppConfig {
   model: string;
   endpoint: string | null;
@@ -33,6 +37,7 @@ export interface AppConfig {
   approval: ApprovalConfig;
   review: ReviewConfig;
   browser: BrowserConfig;
+  manager: ManagerConfig;
 }
 
 export type TaskStatus = 'pending' | 'done' | 'failed' | 'blocked';
