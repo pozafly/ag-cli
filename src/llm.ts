@@ -17,11 +17,32 @@ function normalizeModel(model: string): string {
 }
 
 export async function askModel({ apiKey, model, prompt, endpoint }: AskModelArgs): Promise<string> {
-  const client = new OpenAI({ apiKey, baseURL: endpoint ?? undefined });
+  const client = new OpenAI({
+    apiKey,
+    baseURL: endpoint ?? undefined,
+    timeout: 20_000,
+    maxRetries: 1
+  });
+
   const realModel = normalizeModel(model);
   const res = await client.responses.create({
     model: realModel,
     input: prompt
   });
-  return res.output_text ?? '';
+
+  const text = (res.output_text ?? '').trim();
+  if (text) return text;
+
+  const fallback = res.output
+    ?.flatMap((item) => {
+      if (item.type !== 'message') return [] as string[];
+      return item.content
+        .filter((content) => content.type === 'output_text')
+        .map((content) => content.text.trim())
+        .filter(Boolean);
+    })
+    .join('\n')
+    .trim();
+
+  return fallback || '';
 }
