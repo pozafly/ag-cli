@@ -144,31 +144,54 @@ export function assignRunTasks(state: RunState, managerState: AgentManagerState,
   return state.tasks.map((task) => assignTask(task, managerState.profiles, config.worker.defaultWorker));
 }
 
+function parseRoleFromLlmOutput(output: string, roles: string[]): string | null {
+  const roleLine = output
+    .split('\n')
+    .map((x) => x.trim())
+    .find((x) => x.toLowerCase().startsWith('role='));
+
+  if (roleLine) {
+    const value = roleLine.slice(roleLine.indexOf('=') + 1).trim().toLowerCase();
+    const exact = roles.find((r) => r.toLowerCase() === value);
+    if (exact) return exact;
+  }
+
+  const lowered = output.toLowerCase();
+  return roles.find((r) => lowered.includes(r.toLowerCase())) ?? null;
+}
+
 async function routeRoleByLLM(task: TaskGroup, profiles: AgentProfile[], config: AppConfig): Promise<AgentProfile | null> {
   const roles = [...new Set(profiles.map((p) => p.role))];
   if (roles.length === 0) return null;
 
+  const prompt = [
+    '다음 태스크에 가장 적합한 역할을 하나만 고르세요.',
+    `역할 후보: ${roles.join(', ')}`,
+    `태스크: ${task.goal}`,
+    '규칙: 반드시 한 줄만 출력하고 형식은 role=<역할명> 으로 제한하세요.'
+  ].join('\n');
+
   try {
     const apiKey = resolveApiKey(config);
-    const output = await askModel({
-      apiKey,
-      model: config.model,
-      endpoint: config.endpoint,
-      prompt: [
-        '다음 태스크에 가장 적합한 역할을 하나만 고르세요.',
-        `역할 후보: ${roles.join(', ')}`,
-        `태스크: ${task.goal}`,
-        '출력 형식: role=<역할명>'
-      ].join('\n')
-    });
 
-    const lowered = output.toLowerCase();
-    const role = roles.find((x) => lowered.includes(x.toLowerCase()));
-    if (!role) return null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const output = await askModel({
+        apiKey,
+        model: config.model,
+        endpoint: config.endpoint,
+        prompt
+      });
 
-    return profiles
-      .filter((p) => p.role === role)
-      .sort((a, b) => b.priority - a.priority)[0] ?? null;
+      const role = parseRoleFromLlmOutput(output, roles);
+      if (!role) continue;
+
+      const matched = profiles
+        .filter((p) => p.role === role)
+        .sort((a, b) => b.priority - a.priority)[0];
+      if (matched) return matched;
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -217,12 +240,21 @@ export interface AgentRuntime {
   lastTaskId?: string;
 }
 
+export interface RoleRuntimeSummary {
+  role: string;
+  assigned: number;
+  done: number;
+  failed: number;
+  blocked: number;
+}
+
 export interface ManagerLoopSummary {
   total: number;
   done: number;
   failed: number;
   blocked: number;
   byWorker: AgentRuntime[];
+  byRole: RoleRuntimeSummary[];
 }
 
 function extractUrl(goal: string): string | null {
@@ -307,12 +339,15 @@ export async function runManagerCoreLoop(
   options: ExecuteOptions = {}
 ): Promise<{ state: RunState; summary: ManagerLoopSummary; assignments: TaskAssignment[] }> {
   const assignments = await assignRunTasksWithLLM(planned, managerState, config);
+  const assignmentMap = new Map(assignments.map((x) => [x.taskId, x]));
+  const roleByProfileId = new Map(managerState.profiles.map((x) => [x.id, x.role]));
   const queue: TaskGroup[] = planned.tasks.map((task) => {
-    const matched = assignments.find((a) => a.taskId === task.id);
+    const matched = assignmentMap.get(task.id);
     return matched ? { ...task, assignee: matched.worker } : task;
   });
 
   const runtimes = new Map<WorkerName, AgentRuntime>();
+  const roleSummary = new Map<string, RoleRuntimeSummary>();
   const running = new Set<Promise<void>>();
   const completed: TaskGroup[] = [];
   const maxConcurrency = Math.max(1, config.worker.poolSize);
@@ -332,21 +367,43 @@ export async function runManagerCoreLoop(
     return next;
   };
 
+  const upsertRoleSummary = (taskId: string): RoleRuntimeSummary => {
+    const assignment = assignmentMap.get(taskId);
+    const role = (assignment ? roleByProfileId.get(assignment.profileId) : null) ?? 'unknown';
+    const current = roleSummary.get(role);
+    if (current) return current;
+    const next: RoleRuntimeSummary = { role, assigned: 0, done: 0, failed: 0, blocked: 0 };
+    roleSummary.set(role, next);
+    return next;
+  };
+
   const launch = (task: TaskGroup): void => {
     const runtime = upsertRuntime(task.assignee);
+    const role = upsertRoleSummary(task.id);
     runtime.status = 'running';
     runtime.assigned += 1;
     runtime.lastTaskId = task.id;
+    role.assigned += 1;
 
     const p = executeAssignedTask(task, config, options)
       .then((result) => {
         completed.push(result);
-        if (result.status === 'done') runtime.done += 1;
-        if (result.status === 'failed') runtime.failed += 1;
-        if (result.status === 'blocked') runtime.blocked += 1;
+        if (result.status === 'done') {
+          runtime.done += 1;
+          role.done += 1;
+        }
+        if (result.status === 'failed') {
+          runtime.failed += 1;
+          role.failed += 1;
+        }
+        if (result.status === 'blocked') {
+          runtime.blocked += 1;
+          role.blocked += 1;
+        }
       })
       .catch((err: unknown) => {
         runtime.failed += 1;
+        role.failed += 1;
         completed.push({
           ...task,
           status: 'failed',
@@ -386,7 +443,8 @@ export async function runManagerCoreLoop(
           failed: completed.filter((x) => x.status === 'failed').length,
           blocked: completed.filter((x) => x.status === 'blocked').length
         },
-        byWorker: [...runtimes.values()]
+        byWorker: [...runtimes.values()],
+        byRole: [...roleSummary.values()]
       },
       null,
       2
@@ -398,7 +456,8 @@ export async function runManagerCoreLoop(
     done: state.tasks.filter((x) => x.status === 'done').length,
     failed: state.tasks.filter((x) => x.status === 'failed').length,
     blocked: state.tasks.filter((x) => x.status === 'blocked').length,
-    byWorker: [...runtimes.values()]
+    byWorker: [...runtimes.values()],
+    byRole: [...roleSummary.values()]
   };
 
   return { state, summary, assignments };

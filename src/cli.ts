@@ -206,6 +206,9 @@ manager
       summary.byWorker.forEach((agent) => {
         console.log(`- worker=${agent.worker} assigned=${agent.assigned} done=${agent.done} failed=${agent.failed} blocked=${agent.blocked}`);
       });
+      summary.byRole.forEach((role) => {
+        console.log(`- role=${role.role} assigned=${role.assigned} done=${role.done} failed=${role.failed} blocked=${role.blocked}`);
+      });
       console.log(chalk.green(`\nSaved manager: ${statePath}`));
       console.log(chalk.green(`Saved execution: ${execPath}`));
       console.log(chalk.green(`Saved review: ${review.path}`));
