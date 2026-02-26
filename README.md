@@ -1,47 +1,78 @@
 # ag-cli (Antigravity-style CLI)
 
-Node.js 기반 에이전트/오케스트레이터 CLI MVP.
+Node.js + TypeScript 기반 에이전트/오케스트레이터 CLI.
 
-## 목표
-- Codex 계열 모델로 **task-group planning + 실행 오케스트레이션**
-- 브라우저 서브에이전트(Playwright) 연동
-- 아티팩트 저장(run state / browser research)
+## 핵심 기능
+- Codex 계열 모델 기반 **Task Group planning**
+- 승인 게이트(위험 키워드 탐지, `--approve-risky` 우회)
+- 병렬 워커풀 실행(`worker.poolSize`)
+- 브라우저 서브에이전트(Playwright) 리서치
+- 에이전트 매니저 v1(다중 에이전트 핵심 루프, 역할/워커 집계, 실행 이력, retries 지표, 라우팅 출처 집계)
+- LLM 역할 라우팅 안정화(형식 강제 파서 + 재시도)
+- 실행 결과/리뷰 아티팩트 + 크로스서피스 검증 훅 자동 생성(패스/실패 판정 포함)
 
-## 빠른 시작
+## 설치 및 실행
 ```bash
 cd ag-cli
 npm install
 npx playwright install chromium
 
-# 전역 커맨드로 쓰고 싶으면
-npm link
+# 개발 실행
+npm run dev -- --help
 
-ag init
-export OPENAI_API_KEY=...
-ag run "Build a project scaffold for ..."
-ag browser "https://antigravity.google/"
-ag delegate --worker codex --prompt "이 저장소의 다음 할 일 요약해줘"
+# 빌드
+npm run build
+
+# 전역 커맨드로 연결
+npm link
 ```
 
 ## 명령어
-- `ag init` : 기본 `ag.config.yaml` 생성
-- `ag run "<objective>"` : 오케스트레이터 플래너 실행
-- `ag browser <url>` : 브라우저 서브에이전트 리서치 실행
-- `ag delegate --worker <claude|codex> --prompt "..."` : 외부 워커 CLI 위임 실행
+```bash
+ag init
+ag run "Build a project scaffold for ..."
+ag run "Refactor and delete legacy DB rows" --execute
+ag run "Refactor and delete legacy DB rows" --execute --approve-risky
+ag browser "https://antigravity.google/"
+ag delegate --worker codex --prompt "이 저장소의 다음 할 일 요약해줘"
 
-## 현재 상태 (MVP)
-- [x] 모델 호출
-- [x] Task Group 초안 생성
-- [x] Browser subagent data capture
-- [x] Artifact 저장
-- [ ] 멀티 에이전트 병렬 실행
-- [ ] 승인가드(Request Review)
-- [x] 외부 워커(claude/codex CLI) 위임 실행 MVP
-- [ ] 터미널 액션 플래닝/실행 루프
-- [ ] 장기 메모리/지식아이템 누적
+# 에이전트 매니저 v1
+ag manager init
+ag manager status  # 기본 라우팅 전략 포함 상태 출력
+ag manager assign "안티그래비티 스타일 오케스트레이션 v1 착수"
+ag manager assign "라우팅 전략 점검" --routing heuristic
+ag manager run "다중 에이전트 배정 후 실행까지 진행" --approve-risky
+ag manager run "하이브리드 라우팅 실행" --routing llm-hybrid
+```
 
-## 다음 단계 (v1)
-1. Task Group 실행기(worker pool)
-2. 위험 액션 승인 게이트
-3. 변경점 리뷰 뷰(diff + test + evidence)
-4. 모델 라우팅 전략(quality/fast/fallback)
+## 설정 (`ag.config.yaml`)
+`ag init`으로 기본 설정을 생성합니다.
+
+중요 키:
+- `worker.poolSize`: Task Group 병렬 실행 개수
+- `worker.timeoutMs`: 워커 타임아웃
+- `worker.maxRetries`, `worker.retryBackoffMs`: 워커 실패/타임아웃 시 재시도 정책
+- `approval.enabled`, `approval.riskyKeywords`: 승인 게이트 정책
+- `review.testCommand`, `review.maxDiffChars`: 리뷰 아티팩트 생성 정책
+- `browser.headless`, `browser.slowMoMs`: 브라우저 실행 옵션
+- `manager.routingStrategy`: `heuristic` 또는 `llm-hybrid` 라우팅 전략 선택(오타/알 수 없는 값은 `llm-hybrid`로 자동 정규화)
+
+## 아티팩트 흐름
+- 에이전트 매니저 상태: `artifacts/agent-manager-v1.json`
+- 플랜 저장: `artifacts/run-<session>-plan.json`, `artifacts/run-<session>-manager-plan.json`
+- 실행 저장: `artifacts/run-<session>-exec.json`, `artifacts/run-<session>-manager-exec.json`
+- 라우팅 배정 저장: `artifacts/run-<session>-assignments.json`
+- 워커/브라우저 결과: `artifacts/worker-*.json`, `artifacts/browser-research-*.json`
+- 리뷰 보고서: `artifacts/review-<session>.md`
+- 크로스서피스 검증 훅: `artifacts/cross-surface-<session>.md`
+
+리뷰 아티팩트에는 아래가 포함됩니다.
+- Task 실행 요약
+- `git status --short`
+- 테스트 커맨드 결과
+- diff 일부(최대 `review.maxDiffChars`)
+
+## 개발 메모
+- 소스는 `src/*.ts`
+- 배포 엔트리는 `dist/cli.js`
+- 타입 정의는 `src/types.ts`에서 중앙 관리

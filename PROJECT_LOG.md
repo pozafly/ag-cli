@@ -1,0 +1,31 @@
+# 프로젝트 로그
+
+## 2026-02-26
+- 안티그래비티 스타일 오케스트레이션 착수.
+- 우선순위 1번([할 일] 에이전트 매니저 v1) 구현 시작 및 1차 완료.
+- 백그라운드 자율개선(30분) 추가 착수: 워커 실행 재시도 신뢰성 강화.
+- [23:22 KST] 백그라운드 자율개선 30분 타임박스 시작.
+  - 1순위: manager assign/run에 LLM 라우팅 전략 선택(heuristic/llm-hybrid) 연결
+  - 2순위: 라우팅 실패 원인/폴백 이유를 실행 결과 아티팩트에서 추적 가능하도록 확장
+  - 3순위: 문서/상태 로그/워크로그를 10분 단위로 갱신하고 완료 단위별 커밋+푸시+이슈 코멘트 수행
+- 산출물:
+  - `src/agent-manager.ts` 신규 추가
+  - `ag manager` 하위 커맨드(`init`, `status`, `assign`) 추가
+  - 라우팅 프로필 기반 태스크 할당/실행 이력 저장 구조 도입
+  - README 사용법/아티팩트 문서 갱신
+- 후속 마무리(백그라운드 라운드):
+  - 워커 재시도 루프 도입: `worker.maxRetries`/`worker.retryBackoffMs` 설정을 실행 경로에 반영
+  - 실행 결과 메타데이터 확장: worker 결과에 `attempts`(총 시도 횟수) 기록
+  - 매니저 집계 강화: worker/role별 `retries` 집계 및 CLI 출력 노출
+  - 에이전트 매니저 실행 루프 집계 확장: worker 기준 + role 기준 집계를 동시 기록/출력
+  - LLM 역할 라우팅 안정화: `role=` 포맷 파서, 2회 재시도, 응답 파싱 실패 시 안전 폴백
+  - 크로스서피스 검증 훅 보강: 저장소 루트 자동 감지, 표면별 불일치 검증, pass/fail 판정 노출
+  - 10분 단위 중간보고용 상태 기록 파일 추가(`STATUS_2026-02-26.md`)
+  - 라우팅 전략 설정/옵션화: `manager.routingStrategy`, `ag manager assign/run --routing`
+  - 라우팅 관측성 강화: `routing-summary(llm/fallback/heuristic)`를 콘솔/아티팩트에 동시 기록
+  - 운영 가시성 강화: `ag manager status`에 마지막 실행/역할 분포/기본 라우팅 전략 노출
+  - 추적성 강화: `run-<session>-assignments.json` 아티팩트 저장
+- 2026-02-27 00:00 KST 추가 개선:
+  - 매니저 상태 복원력 강화: 손상/부분 JSON 로딩 시 필드 정규화 + 기본 프로필 자동 복구
+  - 라우팅 전략 정규화: 비정상 값 입력 시 `llm-hybrid` 강제
+  - 라우팅 근거 가시화: assignment reason에 score/keywordHits 기록
