@@ -1,6 +1,6 @@
 # ag-cli (Antigravity-style CLI)
 
-Python 기반 에이전트/오케스트레이터 CLI MVP.
+Node.js 기반 에이전트/오케스트레이터 CLI MVP.
 
 ## 목표
 - Codex 계열 모델로 **task-group planning + 실행 오케스트레이션**
@@ -10,12 +10,14 @@ Python 기반 에이전트/오케스트레이터 CLI MVP.
 ## 빠른 시작
 ```bash
 cd ag-cli
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-playwright install chromium
+npm install
+npx playwright install chromium
+
+# 전역 커맨드로 쓰고 싶으면
+npm link
+
 ag init
-export OPENAI_API_KEY=...   # 또는 ag.config.yaml의 api_key_env 수정
+export OPENAI_API_KEY=...
 ag run "Build a project scaffold for ..."
 ag browser "https://antigravity.google/"
 ```
