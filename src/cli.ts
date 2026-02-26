@@ -204,10 +204,14 @@ manager
       console.log(`- 총 태스크: ${summary.total}`);
       console.log(`- 완료: ${summary.done}, 실패: ${summary.failed}, 보류: ${summary.blocked}`);
       summary.byWorker.forEach((agent) => {
-        console.log(`- worker=${agent.worker} assigned=${agent.assigned} done=${agent.done} failed=${agent.failed} blocked=${agent.blocked}`);
+        console.log(
+          `- worker=${agent.worker} assigned=${agent.assigned} done=${agent.done} failed=${agent.failed} blocked=${agent.blocked} retries=${agent.retries}`
+        );
       });
       summary.byRole.forEach((role) => {
-        console.log(`- role=${role.role} assigned=${role.assigned} done=${role.done} failed=${role.failed} blocked=${role.blocked}`);
+        console.log(
+          `- role=${role.role} assigned=${role.assigned} done=${role.done} failed=${role.failed} blocked=${role.blocked} retries=${role.retries}`
+        );
       });
       console.log(chalk.green(`\nSaved manager: ${statePath}`));
       console.log(chalk.green(`Saved execution: ${execPath}`));

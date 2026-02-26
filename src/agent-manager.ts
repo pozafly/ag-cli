@@ -237,6 +237,7 @@ export interface AgentRuntime {
   done: number;
   failed: number;
   blocked: number;
+  retries: number;
   lastTaskId?: string;
 }
 
@@ -246,6 +247,7 @@ export interface RoleRuntimeSummary {
   done: number;
   failed: number;
   blocked: number;
+  retries: number;
 }
 
 export interface ManagerLoopSummary {
@@ -364,7 +366,8 @@ export async function runManagerCoreLoop(
       assigned: 0,
       done: 0,
       failed: 0,
-      blocked: 0
+      blocked: 0,
+      retries: 0
     };
     runtimes.set(worker, next);
     return next;
@@ -375,7 +378,7 @@ export async function runManagerCoreLoop(
     const role = (assignment ? roleByProfileId.get(assignment.profileId) : null) ?? 'unknown';
     const current = roleSummary.get(role);
     if (current) return current;
-    const next: RoleRuntimeSummary = { role, assigned: 0, done: 0, failed: 0, blocked: 0 };
+    const next: RoleRuntimeSummary = { role, assigned: 0, done: 0, failed: 0, blocked: 0, retries: 0 };
     roleSummary.set(role, next);
     return next;
   };
@@ -391,6 +394,10 @@ export async function runManagerCoreLoop(
     const p = executeAssignedTask(task, config, options)
       .then((result) => {
         completed.push(result);
+        const retries = result.result?.kind === 'worker' ? Math.max(0, (result.result.attempts ?? 1) - 1) : 0;
+        runtime.retries += retries;
+        role.retries += retries;
+
         if (result.status === 'done') {
           runtime.done += 1;
           role.done += 1;

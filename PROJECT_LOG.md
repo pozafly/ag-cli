@@ -12,6 +12,7 @@
 - 후속 마무리(백그라운드 라운드):
   - 워커 재시도 루프 도입: `worker.maxRetries`/`worker.retryBackoffMs` 설정을 실행 경로에 반영
   - 실행 결과 메타데이터 확장: worker 결과에 `attempts`(총 시도 횟수) 기록
+  - 매니저 집계 강화: worker/role별 `retries` 집계 및 CLI 출력 노출
   - 에이전트 매니저 실행 루프 집계 확장: worker 기준 + role 기준 집계를 동시 기록/출력
   - LLM 역할 라우팅 안정화: `role=` 포맷 파서, 2회 재시도, 응답 파싱 실패 시 안전 폴백
   - 크로스서피스 검증 훅 보강: 저장소 루트 자동 감지, 표면별 불일치 검증, pass/fail 판정 노출
