@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { AppConfig, ExecuteOptions, RunState, TaskGroup, WorkerName } from './types.js';
 import { ensureDir, resolveApiKey } from './config.js';
 import { findRiskyKeyword } from './risk.js';
-import { runWorkerTask } from './workers.js';
+import { runWorkerTaskWithRetry } from './workers.js';
 import { browserResearch } from './browser.js';
 import { askModel } from './llm.js';
 
@@ -309,10 +309,12 @@ async function executeAssignedTask(task: TaskGroup, config: AppConfig, options: 
     };
   }
 
-  const result = await runWorkerTask({
+  const { result, attempts } = await runWorkerTaskWithRetry({
     worker: task.assignee,
     prompt: task.goal,
-    timeoutMs: config.worker.timeoutMs
+    timeoutMs: config.worker.timeoutMs,
+    maxRetries: config.worker.maxRetries,
+    retryBackoffMs: config.worker.retryBackoffMs
   });
 
   const success = result.code === 0 && !result.killedByTimeout;
@@ -327,7 +329,8 @@ async function executeAssignedTask(task: TaskGroup, config: AppConfig, options: 
       exitCode: result.code,
       killedByTimeout: result.killedByTimeout,
       stdout: result.stdout,
-      stderr: result.stderr
+      stderr: result.stderr,
+      attempts
     }
   };
 }

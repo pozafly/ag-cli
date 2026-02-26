@@ -16,7 +16,9 @@ export const defaultConfig: AppConfig = {
   worker: {
     poolSize: 2,
     timeoutMs: 120000,
-    defaultWorker: 'codex'
+    defaultWorker: 'codex',
+    maxRetries: 1,
+    retryBackoffMs: 500
   },
   approval: {
     enabled: true,

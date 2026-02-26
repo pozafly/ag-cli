@@ -5,7 +5,7 @@ import { execSync } from 'node:child_process';
 
 import { askModel } from './llm.js';
 import { browserResearch } from './browser.js';
-import { runWorkerTask } from './workers.js';
+import { runWorkerTask, runWorkerTaskWithRetry } from './workers.js';
 import { resolveApiKey, ensureDir } from './config.js';
 import { findRiskyKeyword } from './risk.js';
 import type {
@@ -122,10 +122,12 @@ async function executeTask(task: TaskGroup, config: AppConfig, options: ExecuteO
     };
   }
 
-  const result = await runWorkerTask({
+  const { result, attempts } = await runWorkerTaskWithRetry({
     worker: task.assignee,
     prompt: task.goal,
-    timeoutMs: config.worker.timeoutMs
+    timeoutMs: config.worker.timeoutMs,
+    maxRetries: config.worker.maxRetries,
+    retryBackoffMs: config.worker.retryBackoffMs
   });
 
   const success = result.code === 0 && !result.killedByTimeout;
@@ -140,7 +142,8 @@ async function executeTask(task: TaskGroup, config: AppConfig, options: ExecuteO
       exitCode: result.code,
       killedByTimeout: result.killedByTimeout,
       stdout: result.stdout,
-      stderr: result.stderr
+      stderr: result.stderr,
+      attempts
     }
   };
 }

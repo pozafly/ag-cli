@@ -49,6 +49,7 @@ ag manager run "다중 에이전트 배정 후 실행까지 진행" --approve-ri
 중요 키:
 - `worker.poolSize`: Task Group 병렬 실행 개수
 - `worker.timeoutMs`: 워커 타임아웃
+- `worker.maxRetries`, `worker.retryBackoffMs`: 워커 실패/타임아웃 시 재시도 정책
 - `approval.enabled`, `approval.riskyKeywords`: 승인 게이트 정책
 - `review.testCommand`, `review.maxDiffChars`: 리뷰 아티팩트 생성 정책
 - `browser.headless`, `browser.slowMoMs`: 브라우저 실행 옵션

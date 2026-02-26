@@ -50,6 +50,16 @@ interface RunWorkerTaskArgs {
   timeoutMs?: number;
 }
 
+interface RetryWorkerTaskArgs extends RunWorkerTaskArgs {
+  maxRetries?: number;
+  retryBackoffMs?: number;
+}
+
+export interface RetryWorkerTaskResult {
+  result: WorkerRunResult;
+  attempts: number;
+}
+
 export async function runWorkerTask({ worker, prompt, timeoutMs = 120000 }: RunWorkerTaskArgs): Promise<WorkerRunResult> {
   if (worker === 'codex') {
     return runCommand('codex', [prompt], { timeoutMs });
@@ -60,4 +70,41 @@ export async function runWorkerTask({ worker, prompt, timeoutMs = 120000 }: RunW
   }
 
   throw new AppError(`지원하지 않는 워커입니다: ${worker}`, 'UNSUPPORTED_WORKER');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function runWorkerTaskWithRetry({
+  worker,
+  prompt,
+  timeoutMs = 120000,
+  maxRetries = 0,
+  retryBackoffMs = 500
+}: RetryWorkerTaskArgs): Promise<RetryWorkerTaskResult> {
+  const retries = Math.max(0, maxRetries);
+  const backoff = Math.max(0, retryBackoffMs);
+
+  let attempts = 0;
+  let latest: WorkerRunResult | null = null;
+
+  while (attempts <= retries) {
+    attempts += 1;
+    latest = await runWorkerTask({ worker, prompt, timeoutMs });
+
+    const succeeded = latest.code === 0 && !latest.killedByTimeout;
+    if (succeeded) {
+      return { result: latest, attempts };
+    }
+
+    if (attempts <= retries && backoff > 0) {
+      await sleep(backoff * attempts);
+    }
+  }
+
+  return {
+    result: latest ?? { code: -1, stdout: '', stderr: 'worker 실행 결과가 없습니다.', killedByTimeout: false },
+    attempts
+  };
 }

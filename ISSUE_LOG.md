@@ -18,6 +18,13 @@
   - 1회성 실패/잡음 대응을 위해 동일 프롬프트 재시도(최대 2회)를 추가했습니다.
   - LLM SDK 호출에 timeout/retry 제한을 걸고, `output_text` 비어 있을 때 message content fallback 파싱을 추가했습니다.
 
+## 이슈: 워커 재시도 신뢰성 강화
+- 상태: 진행중
+- 코멘트:
+  - `runWorkerTaskWithRetry`를 추가해 실패/타임아웃 시 설정 기반 재시도(백오프 포함)를 지원합니다.
+  - `orchestrator`와 `agent-manager` 실행 루프가 재시도 API를 사용하도록 교체했습니다.
+  - worker result payload에 `attempts`를 포함해 후처리/품질분석에 활용 가능하게 했습니다.
+
 ## 이슈: 크로스서피스 검증 훅 완성
 - 상태: 완료
 - 코멘트:

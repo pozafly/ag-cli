@@ -4,6 +4,8 @@ export interface WorkerConfig {
   poolSize: number;
   timeoutMs: number;
   defaultWorker: WorkerName;
+  maxRetries: number;
+  retryBackoffMs: number;
 }
 
 export interface ApprovalConfig {
@@ -54,6 +56,7 @@ export interface TaskResultWorker {
   killedByTimeout: boolean;
   stdout: string;
   stderr: string;
+  attempts?: number;
 }
 
 export interface TaskResultBrowser {
