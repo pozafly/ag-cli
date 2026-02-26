@@ -63,8 +63,31 @@ export async function plan(objective, config) {
   };
 }
 
-async function executeTask(task, config) {
+function findRiskyKeyword(goal, config) {
+  const list = config.approval?.riskyKeywords || [];
+  const text = goal.toLowerCase();
+  return list.find((k) => text.includes(String(k).toLowerCase())) || null;
+}
+
+async function executeTask(task, config, options = {}) {
   const startedAt = new Date().toISOString();
+
+  if (config.approval?.enabled) {
+    const risky = findRiskyKeyword(task.goal, config);
+    if (risky && !options.approveRisky) {
+      return {
+        ...task,
+        status: 'blocked',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        error: `요청 승인 필요: 위험 키워드(${risky}) 감지`,
+        approval: {
+          required: true,
+          reason: `risky-keyword:${risky}`
+        }
+      };
+    }
+  }
 
   if (task.assignee === 'browser') {
     const url = extractUrl(task.goal);
@@ -120,14 +143,14 @@ async function executeTask(task, config) {
   };
 }
 
-export async function executeTaskGroups(state, config) {
+export async function executeTaskGroups(state, config, options = {}) {
   const queue = [...state.tasks];
   const poolSize = Math.max(1, Number(config.worker?.poolSize || 1));
   const running = new Set();
   const completed = [];
 
   const launchOne = async (task) => {
-    const p = executeTask(task, config)
+    const p = executeTask(task, config, options)
       .then((result) => completed.push(result))
       .finally(() => running.delete(p));
     running.add(p);

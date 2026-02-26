@@ -15,6 +15,11 @@ export const defaultConfig = {
     timeoutMs: 120000,
     defaultWorker: 'codex'
   },
+  approval: {
+    enabled: true,
+    strategy: 'prompt',
+    riskyKeywords: ['rm -rf', 'drop table', 'delete from', 'truncate', 'sudo', 'ssh', 'scp']
+  },
   browser: {
     headless: true,
     slowMoMs: 0
@@ -31,6 +36,10 @@ export function loadConfig(configPath = 'ag.config.yaml') {
     worker: {
       ...defaultConfig.worker,
       ...(parsed.worker || {})
+    },
+    approval: {
+      ...defaultConfig.approval,
+      ...(parsed.approval || {})
     },
     browser: {
       ...defaultConfig.browser,

@@ -26,6 +26,7 @@ program
   .description('Run planner with high-level objective')
   .argument('<objective>', 'high-level objective')
   .option('-e, --execute', 'execute planned task groups with worker pool')
+  .option('--approve-risky', 'approve risky requests detected by approval gate')
   .action(async (objective, opts) => {
     try {
       const config = loadConfig();
@@ -41,7 +42,7 @@ program
       console.log(chalk.green(`\nSaved plan: ${planPath}`));
 
       if (opts.execute) {
-        const executed = await executeTaskGroups(state, config);
+        const executed = await executeTaskGroups(state, config, { approveRisky: Boolean(opts.approveRisky) });
         const execPath = saveState(executed, config, 'exec');
         console.log(chalk.yellow('\nExecution summary:\n'));
         for (const task of executed.tasks) {
