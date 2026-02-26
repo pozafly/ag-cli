@@ -215,6 +215,9 @@ manager
       console.log(`- routing=${routing}`);
       console.log(`- 총 태스크: ${summary.total}`);
       console.log(`- 완료: ${summary.done}, 실패: ${summary.failed}, 보류: ${summary.blocked}`);
+      console.log(
+        `- routing-summary: llm=${summary.routing.llm}, fallback=${summary.routing.fallback}, heuristic=${summary.routing.heuristic}`
+      );
       summary.byWorker.forEach((agent) => {
         console.log(
           `- worker=${agent.worker} assigned=${agent.assigned} done=${agent.done} failed=${agent.failed} blocked=${agent.blocked} retries=${agent.retries}`

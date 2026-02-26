@@ -44,3 +44,7 @@
   - `ag manager assign/run`에 `--routing` 옵션을 연결해 전략 전환 가능.
   - LLM 라우팅 실패 시 `llm-fallback -> ...` 이유를 남기도록 assignment reason 확장.
   - README에 전략 사용 예시/설정 키 문서화 반영.
+- 코멘트(23:26):
+  - manager 실행 집계에 `routing-summary(llm/fallback/heuristic)`를 추가해 관측성을 강화했습니다.
+  - `latestOutput` JSON에도 routing 집계를 포함해 후처리 파이프라인에서 바로 활용 가능하게 했습니다.
+  - `ag manager status` 요약에 마지막 실행/역할 분포를 추가해 운영 시점 가시성을 개선했습니다.

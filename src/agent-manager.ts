@@ -273,6 +273,12 @@ export interface ManagerLoopSummary {
   blocked: number;
   byWorker: AgentRuntime[];
   byRole: RoleRuntimeSummary[];
+  routing: {
+    strategy: string;
+    llm: number;
+    fallback: number;
+    heuristic: number;
+  };
 }
 
 function extractUrl(goal: string): string | null {
@@ -362,6 +368,15 @@ export async function runManagerCoreLoop(
 ): Promise<{ state: RunState; summary: ManagerLoopSummary; assignments: TaskAssignment[] }> {
   const assignments = await assignRunTasksByStrategy(planned, managerState, config, routingStrategy);
   const assignmentMap = new Map(assignments.map((x) => [x.taskId, x]));
+  const routingSummary = assignments.reduce(
+    (acc, row) => {
+      if (row.reason.startsWith('llm-role=')) acc.llm += 1;
+      else if (row.reason.startsWith('llm-fallback')) acc.fallback += 1;
+      else acc.heuristic += 1;
+      return acc;
+    },
+    { strategy: routingStrategy, llm: 0, fallback: 0, heuristic: 0 }
+  );
   const roleByProfileId = new Map(managerState.profiles.map((x) => [x.id, x.role]));
   const queue: TaskGroup[] = planned.tasks.map((task) => {
     const matched = assignmentMap.get(task.id);
@@ -471,7 +486,8 @@ export async function runManagerCoreLoop(
           blocked: completed.filter((x) => x.status === 'blocked').length
         },
         byWorker: [...runtimes.values()],
-        byRole: [...roleSummary.values()]
+        byRole: [...roleSummary.values()],
+        routing: routingSummary
       },
       null,
       2
@@ -484,17 +500,31 @@ export async function runManagerCoreLoop(
     failed: state.tasks.filter((x) => x.status === 'failed').length,
     blocked: state.tasks.filter((x) => x.status === 'blocked').length,
     byWorker: [...runtimes.values()],
-    byRole: [...roleSummary.values()]
+    byRole: [...roleSummary.values()],
+    routing: routingSummary
   };
 
   return { state, summary, assignments };
 }
 
 export function summarizeAgentManagerState(managerState: AgentManagerState): string {
+  const latestRun = managerState.runs[0];
+  const byRole = managerState.profiles.reduce(
+    (acc, profile) => {
+      acc[profile.role] = (acc[profile.role] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
   return [
     `버전: v${managerState.version}`,
     `프로필 수: ${managerState.profiles.length}`,
     `최근 실행 기록: ${managerState.runs.length}개`,
+    latestRun ? `마지막 실행: ${latestRun.runId} (${latestRun.objective})` : '마지막 실행: 없음',
+    `역할 분포: ${Object.entries(byRole)
+      .map(([role, count]) => `${role}=${count}`)
+      .join(', ')}`,
     ...managerState.profiles.map((p) => `- ${p.id} (${p.role}) -> ${p.worker}`)
   ].join('\n');
 }
