@@ -48,10 +48,11 @@ program
 
       if (opts.execute) {
         const executed = await executeTaskGroups(state, config, { approveRisky: Boolean(opts.approveRisky) });
-        const execPath = saveState(executed, config, 'exec');
         const review = createReviewArtifact(executed, config);
+        const enriched = { ...executed, artifacts: [...executed.artifacts, review] };
+        const execPath = saveState(enriched, config, 'exec');
         console.log(chalk.yellow('\nExecution summary:\n'));
-        for (const task of executed.tasks) {
+        for (const task of enriched.tasks) {
           console.log(`- ${task.id} [${task.assignee}] => ${task.status}`);
         }
         console.log(chalk.green(`\nSaved execution: ${execPath}`));

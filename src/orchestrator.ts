@@ -156,6 +156,15 @@ export async function executeTaskGroups(state: RunState, config: AppConfig, opti
       .then((result) => {
         completed.push(result);
       })
+      .catch((err: unknown) => {
+        completed.push({
+          ...task,
+          status: 'failed',
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          error: err instanceof Error ? err.message : String(err)
+        });
+      })
       .finally(() => {
         running.delete(p);
       });
