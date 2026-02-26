@@ -12,6 +12,21 @@ Return concise, actionable output.
 When planning: produce numbered task groups.
 When executing: report completed, failed, next actions.`;
 
+function inferAssignee(goal, defaultWorker = 'codex') {
+  const text = goal.toLowerCase();
+  if (text.includes('browser') || text.includes('웹') || text.includes('사이트') || text.includes('url')) {
+    return 'browser';
+  }
+  if (text.includes('claude')) return 'claude';
+  if (text.includes('codex')) return 'codex';
+  return defaultWorker;
+}
+
+function extractUrl(goal) {
+  const match = goal.match(/https?:\/\/\S+/i);
+  return match ? match[0] : null;
+}
+
 export async function plan(objective, config) {
   const sessionId = randomUUID().slice(0, 8);
   const apiKey = resolveApiKey(config);
@@ -33,7 +48,7 @@ export async function plan(objective, config) {
     id: `TG-${idx + 1}`,
     goal,
     status: 'pending',
-    assignee: 'agent-main',
+    assignee: inferAssignee(goal, config.worker?.defaultWorker || 'codex'),
     notes: []
   }));
 
@@ -45,6 +60,97 @@ export async function plan(objective, config) {
     tasks,
     artifacts: [],
     latestOutput: output
+  };
+}
+
+async function executeTask(task, config) {
+  const startedAt = new Date().toISOString();
+
+  if (task.assignee === 'browser') {
+    const url = extractUrl(task.goal);
+    if (!url) {
+      return {
+        ...task,
+        status: 'failed',
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        error: 'browser 태스크에 URL이 없어 실행할 수 없습니다.'
+      };
+    }
+
+    const data = await browserResearch(url, {
+      headless: config.browser.headless,
+      slowMoMs: config.browser.slowMoMs
+    });
+
+    return {
+      ...task,
+      status: 'done',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      result: {
+        kind: 'browser',
+        title: data.title,
+        url,
+        links: data.links.slice(0, 10)
+      }
+    };
+  }
+
+  const result = await runWorkerTask({
+    worker: task.assignee,
+    prompt: task.goal,
+    timeoutMs: config.worker.timeoutMs
+  });
+
+  const success = result.code === 0 && !result.killedByTimeout;
+  return {
+    ...task,
+    status: success ? 'done' : 'failed',
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    result: {
+      kind: 'worker',
+      worker: task.assignee,
+      exitCode: result.code,
+      killedByTimeout: result.killedByTimeout,
+      stdout: result.stdout,
+      stderr: result.stderr
+    }
+  };
+}
+
+export async function executeTaskGroups(state, config) {
+  const queue = [...state.tasks];
+  const poolSize = Math.max(1, Number(config.worker?.poolSize || 1));
+  const running = new Set();
+  const completed = [];
+
+  const launchOne = async (task) => {
+    const p = executeTask(task, config)
+      .then((result) => completed.push(result))
+      .finally(() => running.delete(p));
+    running.add(p);
+  };
+
+  while (queue.length || running.size) {
+    while (queue.length && running.size < poolSize) {
+      await launchOne(queue.shift());
+    }
+    if (running.size) {
+      await Promise.race(running);
+    }
+  }
+
+  return {
+    ...state,
+    mode: 'execution',
+    tasks: completed.sort((a, b) => a.id.localeCompare(b.id)),
+    latestOutput: JSON.stringify(
+      completed.map((t) => ({ id: t.id, assignee: t.assignee, status: t.status })),
+      null,
+      2
+    )
   };
 }
 
@@ -93,9 +199,10 @@ export async function delegateTaskToWorker({ worker, prompt, timeoutMs = 120000 
   };
 }
 
-export function saveState(state, config) {
+export function saveState(state, config, suffix = '') {
   const outDir = ensureDir(config.artifactsDir);
-  const fullPath = path.join(outDir, `run-${state.sessionId}.json`);
+  const tail = suffix ? `-${suffix}` : '';
+  const fullPath = path.join(outDir, `run-${state.sessionId}${tail}.json`);
   fs.writeFileSync(fullPath, JSON.stringify(state, null, 2), 'utf8');
   return fullPath;
 }

@@ -10,6 +10,11 @@ export const defaultConfig = {
   endpoint: null,
   apiKeyEnv: 'OPENAI_API_KEY',
   artifactsDir: './artifacts',
+  worker: {
+    poolSize: 2,
+    timeoutMs: 120000,
+    defaultWorker: 'codex'
+  },
   browser: {
     headless: true,
     slowMoMs: 0
@@ -23,6 +28,10 @@ export function loadConfig(configPath = 'ag.config.yaml') {
   return {
     ...defaultConfig,
     ...parsed,
+    worker: {
+      ...defaultConfig.worker,
+      ...(parsed.worker || {})
+    },
     browser: {
       ...defaultConfig.browser,
       ...(parsed.browser || {})

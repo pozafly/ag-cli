@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 
 import { loadConfig, saveSampleConfig } from './config.js';
-import { plan, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
+import { plan, executeTaskGroups, runBrowserSubagent, delegateTaskToWorker, saveState } from './orchestrator.js';
 
 const program = new Command();
 
@@ -25,19 +25,30 @@ program
   .command('run')
   .description('Run planner with high-level objective')
   .argument('<objective>', 'high-level objective')
-  .action(async (objective) => {
+  .option('-e, --execute', 'execute planned task groups with worker pool')
+  .action(async (objective, opts) => {
     try {
       const config = loadConfig();
       const state = await plan(objective, config);
-      const statePath = saveState(state, config);
+      const planPath = saveState(state, config, 'plan');
 
       console.log(chalk.cyan(`\nSession ${state.sessionId}`));
       for (const task of state.tasks) {
-        console.log(`- ${task.id}: ${task.goal}`);
+        console.log(`- ${task.id} [${task.assignee}]: ${task.goal}`);
       }
       console.log(chalk.yellow('\nPlanner output:\n'));
       console.log(state.latestOutput);
-      console.log(chalk.green(`\nSaved: ${statePath}`));
+      console.log(chalk.green(`\nSaved plan: ${planPath}`));
+
+      if (opts.execute) {
+        const executed = await executeTaskGroups(state, config);
+        const execPath = saveState(executed, config, 'exec');
+        console.log(chalk.yellow('\nExecution summary:\n'));
+        for (const task of executed.tasks) {
+          console.log(`- ${task.id} [${task.assignee}] => ${task.status}`);
+        }
+        console.log(chalk.green(`\nSaved execution: ${execPath}`));
+      }
     } catch (err) {
       console.error(chalk.red(err.message));
       process.exit(1);
